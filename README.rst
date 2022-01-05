@@ -47,14 +47,14 @@ This section discusses about underlying technologies that enables Python impleme
 Parallel I/O
 ---------------
 
-Thi sub-section discuses about parallel I/O in Python implementations.
+This sub-section discuses about parallel I/O in Python implementations.
 
 Accelerator
 ---------------
 
-Thi sub-section discuses about using accelerator such as GPU in Python implementations.
+This sub-section discuses about using accelerator such as GPU in Python implementations.
 
 Data format
 ---------------
 
-Thi sub-section discuses about data format.
+This sub-section discuses about data format.
