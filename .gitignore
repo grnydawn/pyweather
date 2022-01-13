@@ -129,3 +129,6 @@ dmypy.json
 .pyre/
 
 venv3*
+*._tmpwork_
+*._tmpbegin_
+*.swp
