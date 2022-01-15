@@ -6,7 +6,7 @@ import accelpy
 NX = 100 # 2000 # 100            # number of local grid cells in the x-dimension
 NZ = 50 # 1000 # 50             # number of local grid cells in the z-dimension
 SIM_TIME = 10 # 5 # 10     # total simulation time in seconds
-OUT_FREQ = 5 # 5 # 10       # frequency to perform output in seconds
+OUT_FREQ = 1 # 5 # 5       # frequency to perform output in seconds
 DATA_SPEC = "DATA_SPEC_THERMAL" # which data initialization to use
 NUM_VARS = 4        # number of fluid state variables
 OUTFILE = "miniweather_accel.slab" # output data file in pyslabs format
@@ -59,7 +59,9 @@ class LocalDomain():
     exner0 = 1. # Surface-level Exner pressure
 
 
-    def __init__(self, nx_glob, nz_glob, data_spec, outfile, workdir):
+    def __init__(self, nx_glob, nz_glob, data_spec, outfile, workdir, debug=False):
+
+        self.debug = debug
 
         self.comm = MPI.COMM_WORLD
         self.nranks = self.comm.Get_size()
@@ -85,34 +87,36 @@ class LocalDomain():
 
         self.dt = min(self.dx, self.dz) / self.max_speed * self.cfl
 
+        order = "F"
+
         state_shape = (self.nx + self.hs*2, self.nz + self.hs*2, NUM_VARS)
-        self.state = numpy.zeros(state_shape, order="F", dtype=numpy.float64)
-        self.state_tmp = numpy.empty(state_shape, order="F", dtype=numpy.float64)
+        self.state = numpy.zeros(state_shape, order=order, dtype=numpy.float64)
+        self.state_tmp = numpy.empty(state_shape, order=order, dtype=numpy.float64)
 
         buf_shape = (self.hs, self.nz, NUM_VARS)
-        self.sendbuf_l = numpy.empty(buf_shape, order="F", dtype=numpy.float64)
-        self.sendbuf_r = numpy.empty(buf_shape, order="F", dtype=numpy.float64)
-        self.recvbuf_l = numpy.empty(buf_shape, order="F", dtype=numpy.float64)
-        self.recvbuf_r = numpy.empty(buf_shape, order="F", dtype=numpy.float64)
+        self.sendbuf_l = numpy.empty(buf_shape, order=order, dtype=numpy.float64)
+        self.sendbuf_r = numpy.empty(buf_shape, order=order, dtype=numpy.float64)
+        self.recvbuf_l = numpy.empty(buf_shape, order=order, dtype=numpy.float64)
+        self.recvbuf_r = numpy.empty(buf_shape, order=order, dtype=numpy.float64)
 
-        self.flux = numpy.zeros((self.nx+1, self.nz+1, NUM_VARS), order="F", dtype=numpy.float64)
-        self.tend = numpy.zeros((self.nx, self.nz, NUM_VARS), order="F", dtype=numpy.float64)
+        self.flux = numpy.zeros((self.nx+1, self.nz+1, NUM_VARS), order=order, dtype=numpy.float64)
+        self.tend = numpy.zeros((self.nx, self.nz, NUM_VARS), order=order, dtype=numpy.float64)
 
-        self.hy_dens_cell = numpy.zeros(self.nz+self.hs*2, dtype=numpy.float64)
-        self.hy_dens_theta_cell = numpy.zeros(self.nz+self.hs*2, dtype=numpy.float64)
+        self.hy_dens_cell = numpy.zeros(self.nz+self.hs*2, order=order, dtype=numpy.float64)
+        self.hy_dens_theta_cell = numpy.zeros(self.nz+self.hs*2, order=order, dtype=numpy.float64)
 
-        self.hy_dens_int = numpy.empty(self.nz+1, dtype=numpy.float64)
-        self.hy_dens_theta_int = numpy.empty(self.nz+1, dtype=numpy.float64)
-        self.hy_pressure_int = numpy.empty(self.nz+1, dtype=numpy.float64)
+        self.hy_dens_int = numpy.empty(self.nz+1, order=order, dtype=numpy.float64)
+        self.hy_dens_theta_int = numpy.empty(self.nz+1, order=order, dtype=numpy.float64)
+        self.hy_pressure_int = numpy.empty(self.nz+1, order=order, dtype=numpy.float64)
 
-        self.stencil = numpy.empty(self.sten_size, dtype=numpy.float64)
-        self.d3_vals = numpy.empty(NUM_VARS, dtype=numpy.float64)
-        self.vals = numpy.empty(NUM_VARS, dtype=numpy.float64)
+        self.stencil = numpy.empty(self.sten_size, order=order, dtype=numpy.float64)
+        self.d3_vals = numpy.empty(NUM_VARS, order=order, dtype=numpy.float64)
+        self.vals = numpy.empty(NUM_VARS, order=order, dtype=numpy.float64)
 
-        self.dens = numpy.empty((self.nx, self.nz), dtype=numpy.float64)
-        self.uwnd = numpy.empty((self.nx, self.nz), dtype=numpy.float64)
-        self.wwnd = numpy.empty((self.nx, self.nz), dtype=numpy.float64)
-        self.theta = numpy.empty((self.nx, self.nz), dtype=numpy.float64)
+        self.dens = numpy.empty((self.nx, self.nz), order=order, dtype=numpy.float64)
+        self.uwnd = numpy.empty((self.nx, self.nz), order=order, dtype=numpy.float64)
+        self.wwnd = numpy.empty((self.nx, self.nz), order=order, dtype=numpy.float64)
+        self.theta = numpy.empty((self.nx, self.nz), order=order, dtype=numpy.float64)
 
         if self.is_master():
             print("nx_glob=%d, nz_glob=%d" % (self.nx_glob, self.nz_glob))
@@ -170,7 +174,7 @@ class LocalDomain():
 
         # create file
         if self.is_master():
-            self.slabs = pyslabs.master_open(outfile, mode="w", num_procs=self.nranks, workdir=workdir)
+            self.slabs = pyslabs.master_open(outfile, mode="w",num_procs=self.nranks, workdir=workdir)
 
             lon = self.slabs.define_dim("lon", self.nx_glob, origin=(0., "O"),
                 points=None, unit=(self.dx, "meter"), desc="longitude", attr_test="T") 
@@ -209,23 +213,21 @@ class LocalDomain():
 
     def compute_tendencies_z(self, state):
 
-#        inputs = [
-#            self.hs, self.nx, self.nz, NUM_VARS, state, self.hv_beta,
-#            self.dz, self.dt, self.sten_size, self.ID_DENS, self.ID_UMOM,
-#            self.ID_WMOM, self.ID_RHOT, self.hy_dens_int, self.c0,
-#            self.gamma, self.hy_pressure_int, self.grav
-#        ]
+        inputs = [
+            self.hs, self.nx, self.nz, NUM_VARS, state, self.hv_beta,
+            self.dz, self.dt, self.sten_size, self.ID_DENS, self.ID_UMOM,
+            self.ID_WMOM, self.ID_RHOT, self.hy_dens_int, self.c0,
+            self.gamma, self.hy_pressure_int, self.grav, self.hy_dens_theta_int
+        ]
 
-        hv_coef = 0.
-
-        inputs = [self.hv_beta, self.dz, self.dt]
-        outputs = [hv_coef]
-
+#        hv_coef = 0.
+#        inputs = [self.hv_beta, self.dz, self.dt]
+#        outputs = [hv_coef]
         #hv_coef = -self.hv_beta * self.dz / (16. * self.dt)
 
-#        outputs = [
-#            self.flux, self.tend
-#        ]
+        outputs = [
+            self.flux, self.tend
+        ]
 
         kind = "fortran"
 
@@ -240,8 +242,7 @@ class LocalDomain():
         with open(ord_tend_z) as fp:
             order = accelpy.Order(fp.read())
 
-        accel = accelpy.Accel(*inputs, order, *outputs, kind=kind)
-        import pdb; pdb.set_trace()
+        accel = accelpy.Accel(*inputs, order, *outputs, kind=kind, debug=self.debug)
 
         accel.run(nteams, nworkers_per_team)
 
@@ -508,11 +509,12 @@ def main():
                         help='output file name')
     parser.add_argument('-w', '--workdir',
                         help='work directory to generate an output file')
+    parser.add_argument('--debug', action="store_true", help='activate debugging mode')
 
     argps = parser.parse_args()
 
     domain = LocalDomain(argps.nx, argps.nz, argps.dataspec, argps.outfile,
-                         argps.workdir)
+                         argps.workdir, debug=argps.debug)
 
     mass0, te0 = domain.reductions()
 
@@ -567,6 +569,7 @@ def main():
         print("d_mass: %f" % ((mass - mass0)/mass0))
         print("d_te: %f" % ((te - te0)/te0))
 
+    #import pdb; pdb.set_trace()
     domain.slabs.close()
 
 

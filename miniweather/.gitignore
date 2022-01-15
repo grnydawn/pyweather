@@ -1,2 +1,4 @@
 *.log
 *.slab
+_accelpy_debug_
+*.out

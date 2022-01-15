@@ -2,8 +2,8 @@ import os, sys, argparse, time, math, numpy
 from mpi4py import MPI
 import pyslabs
 
-NX = 100 # 2000 # 100            # number of local grid cells in the x-dimension
-NZ = 50 # 1000 # 50             # number of local grid cells in the z-dimension
+NX = 10 # 2000 # 100            # number of local grid cells in the x-dimension
+NZ = 5 # 1000 # 50             # number of local grid cells in the z-dimension
 SIM_TIME = 10 # 5 # 10     # total simulation time in seconds
 OUT_FREQ = 5 # 5 # 10       # frequency to perform output in seconds
 DATA_SPEC = "DATA_SPEC_THERMAL" # which data initialization to use
@@ -54,7 +54,9 @@ class LocalDomain():
     exner0 = 1. # Surface-level Exner pressure
 
 
-    def __init__(self, nx_glob, nz_glob, data_spec, outfile, workdir):
+    def __init__(self, nx_glob, nz_glob, data_spec, outfile, workdir, debug=False):
+
+        self.debug = debug
 
         self.comm = MPI.COMM_WORLD
         self.nranks = self.comm.Get_size()
@@ -206,6 +208,10 @@ class LocalDomain():
         # Compute the hyperviscosity coeficient
         hv_coef = -self.hv_beta * self.dz / (16. * self.dt)
 
+        #for k in range(self.nz+1):
+        #    for i in range(self.nx+2*self.hs):
+        #        print("BBB", i+1, k+1, state[i, k, :])
+
         # Compute fluxes in the x-direction for each cell
         for k in range(self.nz+1):
             for i in range(self.nx):
@@ -214,12 +220,16 @@ class LocalDomain():
                 for ll in range(NUM_VARS):
                     for s in range(self.sten_size):
                         self.stencil[s] = state[i + self.hs, k + s, ll]
+                        #print("WWWW", i + self.hs, k + s, ll, self.stencil[s])
 
                     self.vals[ll] = (-self.stencil[0]/12. + 7.*self.stencil[1]/12. +
                                 7.*self.stencil[2]/12. - self.stencil[3]/12.)
 
                     self.d3_vals[ll] = (-self.stencil[0] + 3.*self.stencil[1] -
                                     3.*self.stencil[2] + self.stencil[3])
+
+                #print("AAA", i+1, k+1, self.vals.sum())
+                #print("BBB", i+1, k+1, self.d3_vals.sum())
 
                 # Compute density, u-wind, w-wind, potential temperature,
                 # and pressure (r,u,w,t,p respectively)
@@ -234,6 +244,8 @@ class LocalDomain():
                 if k == 0 or k == self.nz:
                     w = 0.
                     self.d3_vals[self.ID_DENS] = 0.
+
+                #print("BBB", r, u, w, t, p)
 
                 #Compute the flux vector
                 self.flux[i,k,self.ID_DENS] = r*w     - hv_coef*self.d3_vals[self.ID_DENS]
@@ -464,11 +476,12 @@ def main():
                         help='output file name')
     parser.add_argument('-w', '--workdir',
                         help='work directory to generate an output file')
+    parser.add_argument('--debug', action="store_true", help='activate debugging mode')
 
     argps = parser.parse_args()
 
     domain = LocalDomain(argps.nx, argps.nz, argps.dataspec, argps.outfile,
-                         argps.workdir)
+                         argps.workdir, debug=argps.debug)
 
     mass0, te0 = domain.reductions()
 
