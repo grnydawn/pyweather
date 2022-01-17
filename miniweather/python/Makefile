@@ -1,6 +1,6 @@
 
 PYTHON = $(shell which python)
-NRANKS = 1
+NRANKS = 3
 WALLTIME = "00:00:30"
 
 ACCOUNT_SPOCK ?= CLI133
@@ -12,7 +12,7 @@ spock: clean
 	srun -n ${NRANKS} -A ${ACCOUNT_SPOCK} -t ${WALLTIME} -p ${PROJECT_SPOCK} -o miniweather.log  python ./miniweather_mpi.py
 
 summit: clean
-	jsrun -n ${NRANKS} ${PYTHON} ./miniweather_mpi.py -w ${MEMBERWORK}/${LSB_PROJECT_NAME}/pyweatherwork
+	jsrun -n ${NRANKS} ${PYTHON} ./miniweather_mpi.py -o ${MEMBERWORK}/cli115/miniweather_mpi.slab -w ${MEMBERWORK}/cli115/pyweatherwork
 
 profile_spock: clean
 	srun -n ${NRANKS} -A ${ACCOUNT_SPOCK} -t ${WALLTIME} -p ${PROJECT_SPOCK} -o miniweather.log  ./profile.sh

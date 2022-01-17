@@ -1,4 +1,4 @@
-import os, sys, argparse, time, math, numpy
+import os, sys, argparse, time, math, numpy, socket, re
 from mpi4py import MPI
 import pyslabs
 import accelpy
@@ -239,6 +239,7 @@ class LocalDomain():
             print("Not configured yet")
             sys.exit(-1)
 
+
         with open(ord_tend_z) as fp:
             order = accelpy.Order(fp.read())
 
@@ -248,51 +249,51 @@ class LocalDomain():
 
         accel.stop()
 
-        # Compute the hyperviscosity coeficient
-        hv_coef = -self.hv_beta * self.dz / (16. * self.dt)
-
-        # Compute fluxes in the x-direction for each cell
-        for k in range(self.nz+1):
-            for i in range(self.nx):
-                # Use fourth-order interpolation from four cell averages
-                # to compute the value at the interface in question
-                for ll in range(NUM_VARS):
-                    for s in range(self.sten_size):
-                        self.stencil[s] = state[i + self.hs, k + s, ll]
-
-                    self.vals[ll] = (-self.stencil[0]/12. + 7.*self.stencil[1]/12. +
-                                7.*self.stencil[2]/12. - self.stencil[3]/12.)
-
-                    self.d3_vals[ll] = (-self.stencil[0] + 3.*self.stencil[1] -
-                                    3.*self.stencil[2] + self.stencil[3])
-
-                # Compute density, u-wind, w-wind, potential temperature,
-                # and pressure (r,u,w,t,p respectively)
-
-                r = self.vals[self.ID_DENS] + self.hy_dens_int[k]
-                u = self.vals[self.ID_UMOM] / r
-                w = self.vals[self.ID_WMOM] / r
-                t = (self.vals[self.ID_RHOT] + self.hy_dens_theta_int[k] ) / r
-                p = self.c0*math.pow(r*t,self.gamma) - self.hy_pressure_int[k]
-
-                # Enforce vertical boundary condition and exact mass conservation
-                if k == 0 or k == self.nz:
-                    w = 0.
-                    self.d3_vals[self.ID_DENS] = 0.
-
-                #Compute the flux vector
-                self.flux[i,k,self.ID_DENS] = r*w     - hv_coef*self.d3_vals[self.ID_DENS]
-                self.flux[i,k,self.ID_UMOM] = r*w*u   - hv_coef*self.d3_vals[self.ID_UMOM]
-                self.flux[i,k,self.ID_WMOM] = r*w*w+p - hv_coef*self.d3_vals[self.ID_WMOM]
-                self.flux[i,k,self.ID_RHOT] = r*w*t   - hv_coef*self.d3_vals[self.ID_RHOT]
-
-        for ll in range(NUM_VARS):
-            for k in range(self.nz):
-                for i in range(self.nx):
-                    self.tend[i, k, ll] = -(self.flux[i, k+1, ll] - self.flux[i, k, ll]) / self.dz
-                    if ll == self.ID_WMOM:
-                        self.tend[i, k, self.ID_WMOM] = (self.tend[i, k, self.ID_WMOM] -
-                                        state[i+self.hs, k+self.hs, self.ID_DENS] * self.grav)
+#        # Compute the hyperviscosity coeficient
+#        hv_coef = -self.hv_beta * self.dz / (16. * self.dt)
+#
+#        # Compute fluxes in the x-direction for each cell
+#        for k in range(self.nz+1):
+#            for i in range(self.nx):
+#                # Use fourth-order interpolation from four cell averages
+#                # to compute the value at the interface in question
+#                for ll in range(NUM_VARS):
+#                    for s in range(self.sten_size):
+#                        self.stencil[s] = state[i + self.hs, k + s, ll]
+#
+#                    self.vals[ll] = (-self.stencil[0]/12. + 7.*self.stencil[1]/12. +
+#                                7.*self.stencil[2]/12. - self.stencil[3]/12.)
+#
+#                    self.d3_vals[ll] = (-self.stencil[0] + 3.*self.stencil[1] -
+#                                    3.*self.stencil[2] + self.stencil[3])
+#
+#                # Compute density, u-wind, w-wind, potential temperature,
+#                # and pressure (r,u,w,t,p respectively)
+#
+#                r = self.vals[self.ID_DENS] + self.hy_dens_int[k]
+#                u = self.vals[self.ID_UMOM] / r
+#                w = self.vals[self.ID_WMOM] / r
+#                t = (self.vals[self.ID_RHOT] + self.hy_dens_theta_int[k] ) / r
+#                p = self.c0*math.pow(r*t,self.gamma) - self.hy_pressure_int[k]
+#
+#                # Enforce vertical boundary condition and exact mass conservation
+#                if k == 0 or k == self.nz:
+#                    w = 0.
+#                    self.d3_vals[self.ID_DENS] = 0.
+#
+#                #Compute the flux vector
+#                self.flux[i,k,self.ID_DENS] = r*w     - hv_coef*self.d3_vals[self.ID_DENS]
+#                self.flux[i,k,self.ID_UMOM] = r*w*u   - hv_coef*self.d3_vals[self.ID_UMOM]
+#                self.flux[i,k,self.ID_WMOM] = r*w*w+p - hv_coef*self.d3_vals[self.ID_WMOM]
+#                self.flux[i,k,self.ID_RHOT] = r*w*t   - hv_coef*self.d3_vals[self.ID_RHOT]
+#
+#        for ll in range(NUM_VARS):
+#            for k in range(self.nz):
+#                for i in range(self.nx):
+#                    self.tend[i, k, ll] = -(self.flux[i, k+1, ll] - self.flux[i, k, ll]) / self.dz
+#                    if ll == self.ID_WMOM:
+#                        self.tend[i, k, self.ID_WMOM] = (self.tend[i, k, self.ID_WMOM] -
+#                                        state[i+self.hs, k+self.hs, self.ID_DENS] * self.grav)
               
 
     def set_halo_values_x(self, state):

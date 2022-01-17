@@ -9,25 +9,12 @@ set_argnames(inputs, outputs)
 
 [fortran]
 
-integer , parameter :: rp = selected_real_kind(15)
+    integer , parameter :: rp = selected_real_kind(15)
 
-!DEBUG hv_coef = -hv_beta * dz / (16. * dt)
-
-!  subroutine compute_tendencies_z(state,flux,tend)
-!    implicit none
-!    real(rp), intent(in   ) :: state(1-hs:nx+hs,1-hs:nz+hs,NUM_VARS)
-!    real(rp), intent(  out) :: flux (nx+1,nz+1,NUM_VARS)
-!    real(rp), intent(  out) :: tend (nx,nz,NUM_VARS)
     integer :: i,k,ll,s
     real(rp) :: r,u,w,t,p, stencil(4), d3_vals(NUM_VARS), vals(NUM_VARS), hv_coef
     !Compute the hyperviscosity coeficient
     hv_coef = -hv_beta * dz / (16*dt)
-
-!    do k = 1 , nz+1
-!      do i = 1 , nx + 2*hs
-!		print *, i, k, "BBB", state(i,k,:)
-!      end do
-!    end do
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !! TODO: THREAD ME
@@ -48,9 +35,6 @@ integer , parameter :: rp = selected_real_kind(15)
           d3_vals(ll) = -stencil(1) + 3*stencil(2) - 3*stencil(3) + stencil(4)
         enddo
 
-		!print *, "AAA", i, k, sum(vals)
-		!print *, "BBB", i, k, sum(d3_vals)
-
         !Compute density, u-wind, w-wind, potential temperature, and pressure (r,u,w,t,p respectively)
         r = vals(ID_DENS+1) + hy_dens_int(k)
         u = vals(ID_UMOM+1) / r
@@ -62,8 +46,6 @@ integer , parameter :: rp = selected_real_kind(15)
           w                = 0
           d3_vals(ID_DENS+1) = 0
         endif
-
-		!print *, "BBB", r, u, w, t, p
 
         !Compute the flux vector with hyperviscosity
         flux(i,k,ID_DENS+1) = r*w     - hv_coef*d3_vals(ID_DENS+1)
@@ -88,4 +70,3 @@ integer , parameter :: rp = selected_real_kind(15)
         enddo
       enddo
     enddo
-!  end subroutine compute_tendencies_z
