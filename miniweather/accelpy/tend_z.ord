@@ -13,6 +13,7 @@ set_argnames(inputs, outputs)
 
     integer :: i,k,ll,s
     real(rp) :: r,u,w,t,p, stencil(4), d3_vals(NUM_VARS), vals(NUM_VARS), hv_coef
+
     !Compute the hyperviscosity coeficient
     hv_coef = -hv_beta * dz / (16*dt)
 
@@ -25,9 +26,8 @@ set_argnames(inputs, outputs)
         !Use fourth-order interpolation from four cell averages to compute the value at the interface in question
         do ll = 1 , NUM_VARS
           do s = 1 , sten_size
-            !stencil(s) = state(i,k-hs-1+s,ll)
-            !stencil(s) = state(i+hs,k-hs-1+s+hs,ll) ! DEBUG: slicing is different between F and P
-            stencil(s) = state(i+hs,k-1+s,ll) ! DEBUG: slicing is different between F and P
+            !stencil(s) = state(i,k-hs-1+s,ll) ! original
+            stencil(s) = state(i+hs,k-1+s,ll) ! hs is added to state indexes because state numpy array starts with index 0, not -hs
           enddo
           !Fourth-order-accurate interpolation of the state
           vals(ll) = -stencil(1)/12 + 7*stencil(2)/12 + 7*stencil(3)/12 - stencil(4)/12
@@ -36,6 +36,7 @@ set_argnames(inputs, outputs)
         enddo
 
         !Compute density, u-wind, w-wind, potential temperature, and pressure (r,u,w,t,p respectively)
+		! the values of ID_* are incremented by 1 because Fortran index starts from 1, not 0
         r = vals(ID_DENS+1) + hy_dens_int(k)
         u = vals(ID_UMOM+1) / r
         w = vals(ID_WMOM+1) / r
@@ -65,7 +66,7 @@ set_argnames(inputs, outputs)
         do i = 1 , nx
           tend(i,k,ll) = -( flux(i,k+1,ll) - flux(i,k,ll) ) / dz
           if (ll == ID_WMOM+1) then
-            tend(i,k,ID_WMOM+1) = tend(i,k,ID_WMOM+1) - state(i,k,ID_DENS+1)*grav
+            tend(i,k,ID_WMOM+1) = tend(i,k,ID_WMOM+1) - state(i+hs,k+hs,ID_DENS+1)*grav
           endif
         enddo
       enddo
