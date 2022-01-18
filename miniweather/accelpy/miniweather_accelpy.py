@@ -229,9 +229,14 @@ class LocalDomain():
             self.flux, self.tend
         ]
 
-        kind = "fortran"
+        #kind = "fortran"
+        kind = "openacc_fortran"
 
         if kind == "fortran":
+            nteams = 1
+            nworkers_per_team = 1
+
+        elif kind == "openacc_fortran":
             nteams = 1
             nworkers_per_team = 1
 

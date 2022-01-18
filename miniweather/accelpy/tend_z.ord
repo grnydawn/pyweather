@@ -20,6 +20,76 @@ set_argnames(inputs, outputs)
     !! TODO: THREAD ME
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !Compute fluxes in the x-direction for each cell
+
+	!$acc loop collapse(2) private(stencil,vals,d3_vals)
+    do k = 1 , nz+1
+      do i = 1 , nx
+        !Use fourth-order interpolation from four cell averages to compute the value at the interface in question
+        do ll = 1 , NUM_VARS
+          do s = 1 , sten_size
+            !stencil(s) = state(i,k-hs-1+s,ll)
+            !stencil(s) = state(i+hs,k-hs-1+s+hs,ll) ! DEBUG: slicing is different between F and P
+            stencil(s) = state(i+hs,k-1+s,ll) ! DEBUG: slicing is different between F and P
+          enddo
+          !Fourth-order-accurate interpolation of the state
+          vals(ll) = -stencil(1)/12 + 7*stencil(2)/12 + 7*stencil(3)/12 - stencil(4)/12
+          !First-order-accurate interpolation of the third spatial derivative of the state
+          d3_vals(ll) = -stencil(1) + 3*stencil(2) - 3*stencil(3) + stencil(4)
+        enddo
+
+        !Compute density, u-wind, w-wind, potential temperature, and pressure (r,u,w,t,p respectively)
+        r = vals(ID_DENS+1) + hy_dens_int(k)
+        u = vals(ID_UMOM+1) / r
+        w = vals(ID_WMOM+1) / r
+        t = ( vals(ID_RHOT+1) + hy_dens_theta_int(k) ) / r
+        p = C0*(r*t)**gamma - hy_pressure_int(k)
+        !Enforce vertical boundary condition and exact mass conservation
+        if (k == 1 .or. k == nz+1) then
+          w                = 0
+          d3_vals(ID_DENS+1) = 0
+        endif
+
+        !Compute the flux vector with hyperviscosity
+        flux(i,k,ID_DENS+1) = r*w     - hv_coef*d3_vals(ID_DENS+1)
+        flux(i,k,ID_UMOM+1) = r*w*u   - hv_coef*d3_vals(ID_UMOM+1)
+        flux(i,k,ID_WMOM+1) = r*w*w+p - hv_coef*d3_vals(ID_WMOM+1)
+        flux(i,k,ID_RHOT+1) = r*w*t   - hv_coef*d3_vals(ID_RHOT+1)
+      enddo
+    enddo
+    !$acc end loop
+
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !! TODO: THREAD ME
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !Use the fluxes to compute tendencies for each cell
+    !$acc loop collapse(3)
+    do ll = 1 , NUM_VARS
+      do k = 1 , nz
+        do i = 1 , nx
+          tend(i,k,ll) = -( flux(i,k+1,ll) - flux(i,k,ll) ) / dz
+          if (ll == ID_WMOM+1) then
+            tend(i,k,ID_WMOM+1) = tend(i,k,ID_WMOM+1) - state(i,k,ID_DENS+1)*grav
+          endif
+        enddo
+      enddo
+    enddo
+    !$acc end loop
+
+
+[openacc_fortran]
+
+    integer , parameter :: rp = selected_real_kind(15)
+
+    integer :: i,k,ll,s
+    real(rp) :: r,u,w,t,p, stencil(4), d3_vals(NUM_VARS), vals(NUM_VARS), hv_coef
+    !Compute the hyperviscosity coeficient
+    hv_coef = -hv_beta * dz / (16*dt)
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !! TODO: THREAD ME
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !Compute fluxes in the x-direction for each cell
     do k = 1 , nz+1
       do i = 1 , nx
         !Use fourth-order interpolation from four cell averages to compute the value at the interface in question
