@@ -14,23 +14,16 @@ To run Python versions of miniWeather, please install "numpy", "mpi4py", "accelp
 
 Notes::
 
-	To install mpi4py, a working version of MPI should be available. Before installing mpi4py, please make sure that "mpicc --version" commmand generates a compiler version information.
+	To install mpi4py, a working version of MPI should be available.
+	Before installing mpi4py, please make sure that "mpicc --version" commmand
+	generates a compiler version information.
 
 
 Notes to the users of Summit system in OLCF::
 
-	You may need to get an interactive node to install mpi4py. Please try following command to install mpi4py on a summit interactive node
+	You may need to get an interactive node to install mpi4py.
+	Please try following command to install mpi4py on a summit interactive node
 
 	$ module load gcc
 	$ pip install mpi4py
 
-
-Python + MPI version
-========================
-
-This version is located in "python" folder.
-
-
-How to run::
-
-	make su
