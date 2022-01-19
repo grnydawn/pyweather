@@ -43,14 +43,20 @@ With AccelPy, Python programmers can use multiple compiler-based programming mod
 At the time of this writing, Fortran code is used in this version.
 
 
+AccelPy - Scalable Accelerator Interface in Python
+======================================================
+
+To extend Python programs with multiple compiler-based programming models, `AccelPy package <https://github.com/grnydawn/accelpy>`_ is used.
+
+
 PySlabs Parallel I/O
 ========================
 
 To generate data in parallel, `PySlabs parallel I/O Python package <https://github.com/grnydawn/pyslabs>`_ is used.
 
-Once you install the pyslabs package, “slabs” command is also installed together. Try to run following “slabs” command:
+Once you install the pyslabs package, “slabs” command is also installed together. Try to run following “slabs” command once you created a PySlabs data file::
 
->>> slabs info <slab data file>
+        >>> slabs info <slab data file>
 
 
 Plotting the output
