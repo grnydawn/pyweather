@@ -11,7 +11,7 @@ Implementations
 This section collects python implementations of weather and climiate simulations.
 
 miniWeather in Python
-======================
+---------------------
 
 "miniweather" folder includes theminiWeather versions written in Pure Python and Python+Accelerators.
 
