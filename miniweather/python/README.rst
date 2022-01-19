@@ -2,7 +2,7 @@
 Pure Python miniWeather
 ================================
 
-To drive the execution of the version, a Makefile is created (https://github.com/grnydawn/pyweather/blob/master/miniweather/python/Makefile). In the file, the Makefile targets are developed for Summit and Spock systems at ORNL.
+To drive the execution of the version, "Makefile" is created. In the file, the Makefile targets are developed for Summit and Spock systems at ORNL.
 
 To run the Makefile targets for Summit, you need to get an interactive node.
 

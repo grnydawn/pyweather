@@ -11,7 +11,7 @@ At the time of this writing, Fortran code is used in this version.
 Python miniWeather - AccelPy - Fortran
 ----------------------------------------
 
-To support the execution of this version, a Makefile is created (https://github.com/grnydawn/pyweather/blob/master/miniweather/accelpy/Makefile)
+To support the execution of this version, "Makefile" is created.
 
 As explained in the previous section, you may need to modify command arguments to accommodate your environment. Especially, you may need to get an interactive node first if you are on the Summit system of ORNL.
 
@@ -53,11 +53,12 @@ You can find the following code in “compute_tendencies_z” function  of “mi
         accel.stop()
 
 
-“Ord_tend_z” order file
+“ord_tend_z” order file
+------------------------
 
 To specify the content of the offloading, the user needs to create an order file that contains the offload code.
 
-The following is the content of the order file (https://github.com/grnydawn/pyweather/blob/master/miniweather/accelpy/tend_z.ord)::
+The following is the content of the order file::
 
         # list of input argument names
 
