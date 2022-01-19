@@ -1,5 +1,5 @@
 =================
- pyweather
+ PyWeather
 =================
 
 This project is to explore the opportunities of creating large-scale weather/climate simulation in Python.
