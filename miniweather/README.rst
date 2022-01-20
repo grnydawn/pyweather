@@ -2,6 +2,7 @@
 miniWeather in Python
 ================================
 
+miniWeather is a mini app simulating weather-like flows for training in parallelizing accelerated HPC architectures developed by Dr. Matthew Norman (https://github.com/mrnorman/miniWeather)
 
 This folder contains miniWeather version that are ported in Python.
 
