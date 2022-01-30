@@ -1,5 +1,5 @@
 =================
- pyweather
+ PyWeather
 =================
 
 This project is to explore the opportunities of creating large-scale weather/climate simulation in Python.
@@ -9,6 +9,14 @@ Implementations
 =================
 
 This section collects python implementations of weather and climiate simulations.
+
+miniWeather in Python
+---------------------
+
+miniWeather is a mini app simulating weather-like flows for training in parallelizing accelerated HPC architectures developed by Dr. Matthew Norman (https://github.com/mrnorman/miniWeather)
+
+"miniweather" folder includes multiple miniWeather versions written in Pure Python and Python+Accelerators.
+
 
 Performance
 =================
