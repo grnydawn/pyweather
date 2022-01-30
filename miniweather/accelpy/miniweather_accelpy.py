@@ -215,8 +215,8 @@ class LocalDomain():
 
         inputs = [
             self.hs, self.nx, self.nz, NUM_VARS, state, self.hv_beta,
-            self.dz, self.dt, self.sten_size, self.ID_DENS, self.ID_UMOM,
-            self.ID_WMOM, self.ID_RHOT, self.hy_dens_int, self.c0,
+            self.dz, self.dt, self.sten_size, self.ID_DENS+1, self.ID_UMOM+1,
+            self.ID_WMOM+1, self.ID_RHOT+1, self.hy_dens_int, self.c0,
             self.gamma, self.hy_pressure_int, self.grav, self.hy_dens_theta_int
         ]
 
