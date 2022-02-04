@@ -12,8 +12,8 @@ NUM_VARS = 4        # number of fluid state variables
 OUTFILE = "miniweather_accel.slab" # output data file in pyslabs format
 
 here = os.path.dirname(__file__)
-ord_tend_x = os.path.join(here, "tend_x.ord")
-ord_tend_z = os.path.join(here, "tend_z.ord")
+spec_tend_x = os.path.join(here, "tend_x.asf")
+spec_tend_z = os.path.join(here, "tend_z.asf")
 
 
 class LocalDomain():
@@ -196,6 +196,13 @@ class LocalDomain():
 
         self.slabs.begin()
 
+        accel = "fortran"
+
+        with open(spec_tend_z) as fp:
+            spec = accelpy.Spec(fp.read())
+
+        self.kernel_tend_z = accelpy.Kernel(spec, accel=accel, debug=self.debug)
+
     def set_halo_values_z(self, state):
 
         for ll in range(NUM_VARS):
@@ -213,36 +220,14 @@ class LocalDomain():
 
     def compute_tendencies_z(self, state):
 
-        inputs = [
+        data = [
             self.hs, self.nx, self.nz, NUM_VARS, state, self.hv_beta,
             self.dz, self.dt, self.sten_size, self.ID_DENS+1, self.ID_UMOM+1,
             self.ID_WMOM+1, self.ID_RHOT+1, self.hy_dens_int, self.c0,
-            self.gamma, self.hy_pressure_int, self.grav, self.hy_dens_theta_int
+            self.gamma, self.hy_pressure_int, self.grav, self.hy_dens_theta_int, self.flux, self.tend
         ]
 
-        outputs = [
-            self.flux, self.tend
-        ]
-
-        kind = "fortran"
-
-        if kind == "fortran":
-            nteams = 1
-            nworkers_per_team = 1
-
-        else:
-            print("Not configured yet")
-            sys.exit(-1)
-
-
-        with open(ord_tend_z) as fp:
-            order = accelpy.Order(fp.read())
-
-        accel = accelpy.Accel(*inputs, order, *outputs, kind=kind, debug=self.debug)
-
-        accel.run(nteams, nworkers_per_team)
-
-        accel.stop()
+        self.kernel_tend_z.launch(*data)
               
 
     def set_halo_values_x(self, state):
@@ -521,6 +506,7 @@ def main():
 
     #import pdb; pdb.set_trace()
     domain.slabs.close()
+    domain.kernel_tend_z.stop()
 
 
 if __name__ == "__main__":

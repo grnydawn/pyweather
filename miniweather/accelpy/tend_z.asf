@@ -1,10 +1,9 @@
-inputs = ("hs", "nx", "nz", "NUM_VARS", "state", "hv_beta", "dz", "dt",
+args = ("hs", "nx", "nz", "NUM_VARS", "state", "hv_beta", "dz", "dt",
 		  "sten_size", "ID_DENS", "ID_UMOM", "ID_WMOM", "ID_RHOT",
 		  "hy_dens_int", "c0", "gamma", "hy_pressure_int", "grav",
-		  "hy_dens_theta_int")
-outputs = ("flux", "tend")
+		  "hy_dens_theta_int", "flux", "tend")
 
-set_argnames(*(inputs+outputs))
+set_argnames(*args)
 
 attrspec = { "state": {"dimension": "1-hs:nx+hs,1-hs:nz+hs,NUM_VARS"}}
 
