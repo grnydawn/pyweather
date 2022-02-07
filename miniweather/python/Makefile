@@ -1,6 +1,6 @@
 
 PYTHON = $(shell which python)
-NRANKS = 3
+NRANKS = 4
 WALLTIME = "00:00:30"
 
 ACCOUNT_SPOCK ?= CLI133
