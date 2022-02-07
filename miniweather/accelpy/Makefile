@@ -8,7 +8,7 @@ spock: clean
 
 summit: clean
 	#jsrun -n ${NPROCS} ${PYTHON} ./miniweather_accelpy.py -o ${MEMBERWORK}/cli115/miniweather_accel.slab -w ${MEMBERWORK}/cli115/pyweatherwork
-	jsrun -n ${NPROCS} ${PYTHON} ./miniweather_accelpy.py -o ${MEMBERWORK}/cli115/miniweather_accel.slab
+	jsrun -n ${NPROCS} ${PYTHON} ./miniweather_accelpy.py -o ${MEMBERWORK}/cli115/miniweather_accel.slab -w ${MEMBERWORK}/cli115/pyweatherwork
 
 debug: clean
 	python ./miniweather_accelpy.py
