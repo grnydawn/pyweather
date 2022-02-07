@@ -9,7 +9,8 @@ PROJECT_SPOCK ?= ecp
 PROJECT_SUMMIT ?= cli115
 
 spock: clean
-	srun -n ${NRANKS} -A ${ACCOUNT_SPOCK} -t ${WALLTIME} -p ${PROJECT_SPOCK} -o miniweather.log  python ./miniweather_mpi.py
+	#srun -n ${NRANKS} -A ${ACCOUNT_SPOCK} -t ${WALLTIME} -p ${PROJECT_SPOCK} -o miniweather.log  python ./miniweather_mpi.py
+	srun -n ${NRANKS} python ./miniweather_mpi.py
 
 summit: clean
 	jsrun -n ${NRANKS} ${PYTHON} ./miniweather_mpi.py -o ${MEMBERWORK}/cli115/miniweather_mpi.slab -w ${MEMBERWORK}/cli115/pyweatherwork

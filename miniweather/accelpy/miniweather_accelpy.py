@@ -227,8 +227,8 @@ class LocalDomain():
             self.gamma, self.hy_pressure_int, self.grav, self.hy_dens_theta_int, self.flux, self.tend
         ]
 
-        self.kernel_tend_z.launch(*data)
-              
+        task = self.kernel_tend_z.launch(*data)
+        task.wait()
 
     def set_halo_values_x(self, state):
 

@@ -1,10 +1,10 @@
 PYTHON = $(shell which python)
 PROJECT ?= ecp
 WALLTIME ?= "00:01:00"
-NPROCS ?= 3
+NPROCS ?= 4
 
 spock: clean
-	srun -n ${NPROCS} -A cli133 -t ${WALLTIME} -p ${PROJECT} -o miniweather_accelpy.log  python ./miniweather_accelpy.py
+	srun -n${NPROCS} python ./miniweather_accelpy.py
 
 summit: clean
 	#jsrun -n ${NPROCS} ${PYTHON} ./miniweather_accelpy.py -o ${MEMBERWORK}/cli115/miniweather_accel.slab -w ${MEMBERWORK}/cli115/pyweatherwork
