@@ -2,3 +2,4 @@
 *.slab
 _accelpy_debug_
 *.out
+*.png

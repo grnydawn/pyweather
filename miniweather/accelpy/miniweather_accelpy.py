@@ -196,7 +196,13 @@ class LocalDomain():
 
         self.slabs.begin()
 
-        accel = "fortran"
+        #accel_x = "fortran"
+        #accel_x = "openmp_fortran"
+        accel_x = "openacc_fortran"
+
+        #accel_z = "fortran"
+        #accel_z = "openmp_fortran"
+        accel_z = "openacc_fortran"
 
         with open(spec_tend_x) as fp:
             spec_x = accelpy.Spec(fp.read())
@@ -204,8 +210,8 @@ class LocalDomain():
         with open(spec_tend_z) as fp:
             spec_z = accelpy.Spec(fp.read())
 
-        self.kernel_tend_x = accelpy.Kernel(spec_x, accel=accel, debug=self.debug)
-        self.kernel_tend_z = accelpy.Kernel(spec_z, accel=accel, debug=self.debug)
+        self.kernel_tend_x = accelpy.Kernel(spec_x, accel=accel_x, debug=self.debug)
+        self.kernel_tend_z = accelpy.Kernel(spec_z, accel=accel_z, debug=self.debug)
 
     def set_halo_values_z(self, state):
 
@@ -269,7 +275,6 @@ class LocalDomain():
             self.gamma, self.grav, self.hy_dens_theta_cell, self.flux, self.tend
         ]
 
-        #import pdb; pdb.set_trace()
         task = self.kernel_tend_x.launch(*data)
         task.wait()
 

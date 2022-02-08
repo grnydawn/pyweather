@@ -3,17 +3,21 @@ args = ("hs", "nx", "nz", "NUM_VARS", "state", "hv_beta", "dz", "dt",
 		  "hy_dens_int", "c0", "gamma", "hy_pressure_int", "grav",
 		  "hy_dens_theta_int", "flux", "tend")
 
+
 set_argnames(*args)
 
 attrspec = { "state": {"dimension": "1-hs:nx+hs,1-hs:nz+hs,NUM_VARS"}}
 
 
-[fortran: attrspec=attrspec]
+[fortran, openmp_fortran, openacc_fortran: attrspec=attrspec]
 
     integer , parameter :: rp = selected_real_kind(15)
 
     integer :: i,k,ll,s
     real(rp) :: r,u,w,t,p, stencil(4), d3_vals(NUM_VARS), vals(NUM_VARS), hv_coef
+
+
+    !!$acc enter data copyin(hy_dens_int,hy_dens_theta_int,hy_pressure_int, state) create(flux, tend)
 
     !Compute the hyperviscosity coeficient
     hv_coef = -hv_beta * dz / (16*dt)
@@ -22,6 +26,7 @@ attrspec = { "state": {"dimension": "1-hs:nx+hs,1-hs:nz+hs,NUM_VARS"}}
     !! TODO: THREAD ME
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !Compute fluxes in the x-direction for each cell
+    !$omp parallel do private(stencil,vals,d3_vals,r,u,w,t,p,ll,s) collapse(2)
     do k = 1 , nz+1
       do i = 1 , nx
         !Use fourth-order interpolation from four cell averages to compute the value at the interface in question
@@ -57,10 +62,11 @@ attrspec = { "state": {"dimension": "1-hs:nx+hs,1-hs:nz+hs,NUM_VARS"}}
     enddo
 
 
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !! TODO: THREAD ME
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !$acc enter data copyin(flux, state) create(tend)
+
     !Use the fluxes to compute tendencies for each cell
+    !$acc parallel loop collapse(3)
+    !$omp parallel do collapse(3)
     do ll = 1 , NUM_VARS
       do k = 1 , nz
         do i = 1 , nx
@@ -71,3 +77,5 @@ attrspec = { "state": {"dimension": "1-hs:nx+hs,1-hs:nz+hs,NUM_VARS"}}
         enddo
       enddo
     enddo
+
+    !$acc exit data copyout(tend)
