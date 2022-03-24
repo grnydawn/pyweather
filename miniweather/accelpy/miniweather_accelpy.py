@@ -6,7 +6,7 @@ import accelpy
 NX = 100 # 2000 # 100            # number of local grid cells in the x-dimension
 NZ = 50 # 1000 # 50             # number of local grid cells in the z-dimension
 SIM_TIME = 10 # 5 # 10     # total simulation time in seconds
-OUT_FREQ = 1 # 5 # 5       # frequency to perform output in seconds
+OUT_FREQ = 5 # 5 # 5       # frequency to perform output in seconds
 DATA_SPEC = "DATA_SPEC_THERMAL" # which data initialization to use
 NUM_VARS = 4        # number of fluid state variables
 OUTFILE = "miniweather_accel.slab" # output data file in pyslabs format
@@ -196,22 +196,27 @@ class LocalDomain():
 
         self.slabs.begin()
 
-        #accel_x = "fortran"
-        #accel_x = "openmp_fortran"
-        accel_x = "openacc_fortran"
+        print("OMP_NUM_THREADS=%s" % os.environ.get("OMP_NUM_THREADS", "NOT_DEFINED"))
 
-        #accel_z = "fortran"
-        #accel_z = "openmp_fortran"
-        accel_z = "openacc_fortran"
+        acctype = "omptarget_fortran"
+        #acctype = "openacc_fortran"
+        #acctype = "openmp_fortran"
+        #acctype = "fortran"
 
         with open(spec_tend_x) as fp:
-            spec_x = accelpy.Spec(fp.read())
+            self.kernel_tend_x = accelpy.Kernel(fp.read(), debug=debug)
 
         with open(spec_tend_z) as fp:
-            spec_z = accelpy.Spec(fp.read())
+            self.kernel_tend_z = accelpy.Kernel(fp.read(), debug=debug)
 
-        self.kernel_tend_x = accelpy.Kernel(spec_x, accel=accel_x, debug=self.debug)
-        self.kernel_tend_z = accelpy.Kernel(spec_z, accel=accel_z, debug=self.debug)
+        mapto = (self.hy_dens_int, self.hy_pressure_int, self.hy_dens_theta_int,
+                    self.hy_dens_cell, self.hy_dens_theta_cell)
+        mapalloc = (self.state_tmp, self.tend, self.flux)
+        mapfrom = (self.state,)
+
+        self.accel = accelpy.AccelData(self.kernel_tend_x, self.kernel_tend_z,
+                        acctype=acctype, mapto=mapto, mapalloc=mapalloc,
+                        mapfrom=mapfrom, debug=debug)
 
     def set_halo_values_z(self, state):
 
@@ -237,7 +242,7 @@ class LocalDomain():
             self.gamma, self.hy_pressure_int, self.grav, self.hy_dens_theta_int, self.flux, self.tend
         ]
 
-        task = self.kernel_tend_z.launch(*data)
+        task = self.kernel_tend_z.launch(*data, acctype="omptarget_fortran")
         task.wait()
 
     def set_halo_values_x(self, state):
@@ -275,8 +280,9 @@ class LocalDomain():
             self.gamma, self.grav, self.hy_dens_theta_cell, self.flux, self.tend
         ]
 
-        task = self.kernel_tend_x.launch(*data)
+        task = self.kernel_tend_x.launch(*data, acctype="omptarget_fortran")
         task.wait()
+        #time.sleep(1)
 
 #        # Compute the hyperviscosity coeficient
 #        hv_coef = -self.hv_beta * self.dx / (16. * self.dt)
@@ -498,7 +504,7 @@ def main():
 
             output_counter = output_counter + domain.dt 
             if output_counter >= argps.outfreq:
-    #
+    
     #            print("")
     #            print("%d state sum: %f" % (self.rank, self.state.sum()))
     #            print("%d state_tmp sum: %f" % (self.rank, self.state_tmp.sum()))
@@ -519,16 +525,15 @@ def main():
     if domain.is_master():
         print("CPU Time: %f" % (time.time() - start_time))
 
+    #import pdb; pdb.set_trace()
+    domain.slabs.close()
+    domain.accel.stop()
+
     mass, te = domain.reductions()
 
     if domain.is_master():
         print("d_mass: %f" % ((mass - mass0)/mass0))
         print("d_te: %f" % ((te - te0)/te0))
-
-    #import pdb; pdb.set_trace()
-    domain.slabs.close()
-    domain.kernel_tend_x.stop()
-    domain.kernel_tend_z.stop()
 
 
 if __name__ == "__main__":
