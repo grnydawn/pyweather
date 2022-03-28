@@ -15,6 +15,12 @@ spock: clean
 summit: clean
 	jsrun -n ${NRANKS} ${PYTHON} ./miniweather_mpi.py -o ${MEMBERWORK}/cli115/miniweather_mpi.slab -w ${MEMBERWORK}/cli115/pyweatherwork
 
+
+crusher_debug: clean
+	#srun -n1 python ./miniweather_accelpy.py --debug
+	srun -n1 python ./miniweather_mpi.py
+
+
 profile_spock: clean
 	srun -n ${NRANKS} -A ${ACCOUNT_SPOCK} -t ${WALLTIME} -p ${PROJECT_SPOCK} -o miniweather.log  ./profile.sh
 
