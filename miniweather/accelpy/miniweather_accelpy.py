@@ -9,11 +9,11 @@ SIM_TIME = 10 # 5 # 10     # total simulation time in seconds
 OUT_FREQ = 1 # 5 # 10       # frequency to perform output in seconds
 DATA_SPEC = "DATA_SPEC_THERMAL" # which data initialization to use
 NUM_VARS = 4        # number of fluid state variables
-OUTFILE = "miniweather_mpi.slab" # output data file in pyslabs format
+OUTFILE = "miniweather_accel.slab" # output data file in pyslabs format
 
 here = os.path.dirname(__file__)
-spec_tend_x = os.path.join(here, "tend_x.asf")
-spec_tend_z = os.path.join(here, "tend_z.asf")
+spec_tend_x = os.path.join(here, "tend_x.knl")
+spec_tend_z = os.path.join(here, "tend_z.knl")
 
 class LocalDomain():
     """a local domain that has spatial state and computation of the domain
@@ -196,6 +196,25 @@ class LocalDomain():
         accel_type = "omptarget"
         lang_type = "fortran"
 
+        sdimattr = "%d:%d, %d:%d, %d" % (1-self.hs, self.nx+self.hs,
+                                1-self.hs, self.nz+self.hs, NUM_VARS)
+        cdimattr = "%d:%d" % (1-self.hs, self.nz+self.hs)
+
+        attr = {
+            id(self.state): {
+                "dimension": sdimattr
+            },
+            id(self.state_tmp): {
+                "dimension": sdimattr
+            },
+            id(self.hy_dens_cell): {
+                "dimension": cdimattr
+            },
+            id(self.hy_dens_theta_cell): {
+                "dimension": cdimattr
+            }
+        }
+
         self.accel = accelpy.Accel(
             accel=accel_type,
             lang=lang_type,
@@ -210,10 +229,11 @@ class LocalDomain():
             alloc=(
                 self.flux,
                 self.tend),
+            attr=attr,
             _debug=self.debug)
 
-        #with open(spec_tend_x) as fp:
-        #    self.kernel_x = self.accel.register(fp.read())
+        with open(spec_tend_x) as fp:
+            self.kernel_x = accelpy.Kernel(fp.read())
 
         with open(spec_tend_z) as fp:
             self.kernel_z = accelpy.Kernel(fp.read())
@@ -235,17 +255,17 @@ class LocalDomain():
 
     def compute_tendencies_z(self, state):
 
-        #data = [self.hs]
         data = [
             self.hs, self.nx, self.nz, NUM_VARS, state, self.hv_beta,
             self.dz, self.dt, self.sten_size, self.ID_DENS+1, self.ID_UMOM+1,
             self.ID_WMOM+1, self.ID_RHOT+1, self.hy_dens_int, self.c0,
-            self.gamma, self.hy_pressure_int, self.grav, self.hy_dens_theta_int, self.flux, self.tend
+            self.gamma, self.hy_pressure_int, self.grav,
+            self.hy_dens_theta_int, self.flux, self.tend
         ]
 
         self.accel.launch(self.kernel_z, *data)
 
-        #print("ZZZZ TEND", numpy.sum(self.tend))
+        print("ZZZZ TEND", numpy.sum(self.tend))
 
 #
 #        # Compute the hyperviscosity coeficient
@@ -332,54 +352,55 @@ class LocalDomain():
         MPI.Request.Waitall(sends)
 
     def compute_tendencies_x(self, state):
+
+        data = [
+            self.hs, self.nx, self.nz, NUM_VARS, state, self.hv_beta,
+            self.dx, self.dt, self.sten_size, self.ID_DENS+1, self.ID_UMOM+1,
+            self.ID_WMOM+1, self.ID_RHOT+1, self.hy_dens_cell, self.c0,
+            self.gamma, self.grav, self.hy_dens_theta_cell, self.flux, self.tend
+        ]
+
+        self.accel.launch(self.kernel_x, *data)
+
+
+#        # Compute the hyperviscosity coeficient
+#        hv_coef = -self.hv_beta * self.dx / (16. * self.dt)
 #
-#        data = [
-#            self.hs, self.nx, self.nz, NUM_VARS, state, self.hv_beta,
-#            self.dx, self.dt, self.sten_size, self.ID_DENS+1, self.ID_UMOM+1,
-#            self.ID_WMOM+1, self.ID_RHOT+1, self.hy_dens_cell, self.c0,
-#            self.gamma, self.grav, self.hy_dens_theta_cell, self.flux, self.tend
-#        ]
+#        # Compute fluxes in the x-direction for each cell
+#        for k in range(self.nz):
+#            for i in range(self.nx + 1):
+#                # Use fourth-order interpolation from four cell averages
+#                # to compute the value at the interface in question
+#                for ll in range(NUM_VARS):
+#                    for s in range(self.sten_size):
+#                        self.stencil[s] = state[i + s, k+self.hs, ll]
 #
-#        self.accel.launch(self.kernel_x, *data)
+#                    self.vals[ll] = (-self.stencil[0]/12. + 7.*self.stencil[1]/12. +
+#                                7.*self.stencil[2]/12. - self.stencil[3]/12.)
+#                    self.d3_vals[ll] = (-self.stencil[0] + 3.*self.stencil[1] -
+#                                    3.*self.stencil[2] + self.stencil[3])
 #
-#        print("XXXX TEND", numpy.sum(self.tend))
+#                # Compute density, u-wind, w-wind, potential temperature,
+#                # and pressure (r,u,w,t,p respectively)
+#
+#                r = self.vals[self.ID_DENS] + self.hy_dens_cell[k+self.hs]
+#                u = self.vals[self.ID_UMOM] / r
+#                w = self.vals[self.ID_WMOM] / r
+#                t = (self.vals[self.ID_RHOT] + self.hy_dens_theta_cell[k+self.hs] ) / r
+#                p = self.c0*math.pow(r*t, self.gamma)
+#
+#                #Compute the flux vector
+#                self.flux[i,k,self.ID_DENS] = r*u     - hv_coef*self.d3_vals[self.ID_DENS]
+#                self.flux[i,k,self.ID_UMOM] = r*u*u+p - hv_coef*self.d3_vals[self.ID_UMOM]
+#                self.flux[i,k,self.ID_WMOM] = r*u*w   - hv_coef*self.d3_vals[self.ID_WMOM]
+#                self.flux[i,k,self.ID_RHOT] = r*u*t   - hv_coef*self.d3_vals[self.ID_RHOT]
+#
+#        for ll in range(NUM_VARS):
+#            for k in range(self.nz):
+#                for i in range(self.nx):
+#                    self.tend[i, k, ll] = -(self.flux[i+1, k, ll] - self.flux[i, k, ll]) / self.dx
 
-        # Compute the hyperviscosity coeficient
-        hv_coef = -self.hv_beta * self.dx / (16. * self.dt)
-
-        # Compute fluxes in the x-direction for each cell
-        for k in range(self.nz):
-            for i in range(self.nx + 1):
-                # Use fourth-order interpolation from four cell averages
-                # to compute the value at the interface in question
-                for ll in range(NUM_VARS):
-                    for s in range(self.sten_size):
-                        self.stencil[s] = state[i + s, k+self.hs, ll]
-
-                    self.vals[ll] = (-self.stencil[0]/12. + 7.*self.stencil[1]/12. +
-                                7.*self.stencil[2]/12. - self.stencil[3]/12.)
-                    self.d3_vals[ll] = (-self.stencil[0] + 3.*self.stencil[1] -
-                                    3.*self.stencil[2] + self.stencil[3])
-
-                # Compute density, u-wind, w-wind, potential temperature,
-                # and pressure (r,u,w,t,p respectively)
-
-                r = self.vals[self.ID_DENS] + self.hy_dens_cell[k+self.hs]
-                u = self.vals[self.ID_UMOM] / r
-                w = self.vals[self.ID_WMOM] / r
-                t = (self.vals[self.ID_RHOT] + self.hy_dens_theta_cell[k+self.hs] ) / r
-                p = self.c0*math.pow(r*t, self.gamma)
-
-                #Compute the flux vector
-                self.flux[i,k,self.ID_DENS] = r*u     - hv_coef*self.d3_vals[self.ID_DENS]
-                self.flux[i,k,self.ID_UMOM] = r*u*u+p - hv_coef*self.d3_vals[self.ID_UMOM]
-                self.flux[i,k,self.ID_WMOM] = r*u*w   - hv_coef*self.d3_vals[self.ID_WMOM]
-                self.flux[i,k,self.ID_RHOT] = r*u*t   - hv_coef*self.d3_vals[self.ID_RHOT]
-
-        for ll in range(NUM_VARS):
-            for k in range(self.nz):
-                for i in range(self.nx):
-                    self.tend[i, k, ll] = -(self.flux[i+1, k, ll] - self.flux[i, k, ll]) / self.dx
+        print("XXXX TEND", numpy.sum(self.tend))
 
     def semi_discrete_step(self, state_init, state_forcing, state_out, dt, dir):
 
