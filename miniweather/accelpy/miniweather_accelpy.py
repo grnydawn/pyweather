@@ -193,7 +193,10 @@ class LocalDomain():
 
         self.slabs.begin()
 
-        accel_type = "omptarget"
+        #accel_type = "omptarget"
+        #accel_type = "openacc"
+        accel_type = "openmp"
+        #accel_type = "fortran"
         lang_type = "fortran"
 
         sdimattr = "%d:%d, %d:%d, %d" % (1-self.hs, self.nx+self.hs,

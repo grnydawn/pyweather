@@ -29,7 +29,8 @@ profile: clean
 	srun -n ${NPROCS} -A cli133 -t ${WALLTIME} -p ${PROJECT} -o miniweather_accelpy.log  ./profile.sh
 
 crusher_profile: clean
-	module load craype-accel-amd-gfx90a rocm; srun -n${NPROCS} profile.sh -o ${MEMBERWORK}/cli115/miniweather_accel.slab -w ${MEMBERWORK}/cli115/pyweatherwork
+	#module load craype-accel-amd-gfx90a rocm; srun -n${NPROCS} profile.sh -o ${MEMBERWORK}/cli115/miniweather_accel.slab -w ${MEMBERWORK}/cli115/pyweatherwork
+	module load craype-accel-amd-gfx90a rocm; srun -n1 profile.sh
 
 valgrind_spock: clean
 	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes python ./miniweather_accelpy.py --debug &> valgrind.out
