@@ -1,0 +1,70 @@
+args = ("hs", "nx", "nz", "dt", "NUM_VARS", "state", "tend")
+
+set_argnames(*args)
+
+[fortran, openmp_fortran]
+
+    integer :: i,k,ll
+
+    !$omp parallel do collapse(3)
+    do ll = 1 , NUM_VARS
+      do k = 1 , nz
+        do i = 1 , nx
+          state(i,k,ll) = state(i,k,ll) + dt * tend(i,k,ll)
+        end do
+      end do
+    end do
+
+
+[omptarget_fortran]
+
+    integer :: i,k,ll
+
+    !$omp target update to(state)
+
+    !$omp target teams num_teams(nx) distribute parallel do collapse(3)
+    do ll = 1 , NUM_VARS
+      do k = 1 , nz
+	    do i = 1 , nx
+          state(i,k,ll) = state(i,k,ll) + dt * tend(i,k,ll)
+        end do
+      end do
+    end do
+    !$omp end target teams distribute parallel do
+
+    !$omp target update from(state)
+
+[openacc_fortran]
+
+    integer :: i,k,ll
+
+    !$acc update device(state, tend)
+
+	!$acc parallel loop collapse(3)
+    do k = 1 , nz
+	  do i = 1 , nx
+        do ll = 1 , NUM_VARS
+          state(i,k,ll) = state(i,k,ll) + dt * tend(i,k,ll)
+        end do
+      end do
+    end do
+
+    !$acc update self(state)
+
+[cpp, omptarget_cpp, openacc_cpp]
+
+    #pragma omp target update to(state)
+    #pragma acc update device(state)
+
+    #pragma omp target teams distribute parallel for collapse(3)
+    #pragma acc parallel loop collapse(3)
+	for (int ll=0; ll < NUM_VARS; ll++) {
+	  for (int k=0; k < nz; k++) {
+	    for (int i=0; i < nx; i++) {
+          state[i+hs][k+hs][ll] = state[i+hs][k+hs][ll] + dt * tend[i][k][ll];
+	    }
+	  }
+	}
+
+    #pragma acc update self(state)
+    #pragma omp target update from(state)

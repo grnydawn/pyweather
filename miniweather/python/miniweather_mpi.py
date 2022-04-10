@@ -2,8 +2,8 @@ import os, sys, argparse, time, math, numpy
 from mpi4py import MPI
 import pyslabs
 
-NX = 100 # 2000 # 100            # number of local grid cells in the x-dimension
-NZ = 50 # 1000 # 50             # number of local grid cells in the z-dimension
+NX = 400 # 100 # 2000 # 100            # number of local grid cells in the x-dimension
+NZ = 200 # 50 # 1000 # 50             # number of local grid cells in the z-dimension
 SIM_TIME = 10 # 5 # 10     # total simulation time in seconds
 OUT_FREQ = 1 # 5 # 10       # frequency to perform output in seconds
 DATA_SPEC = "DATA_SPEC_THERMAL" # which data initialization to use

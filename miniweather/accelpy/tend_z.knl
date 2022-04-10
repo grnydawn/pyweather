@@ -93,8 +93,9 @@ set_argnames(*args)
     !! TODO: THREAD ME
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    !Compute fluxes in the x-direction for each cell
-    !$omp target teams distribute num_teams(nz+1)
+    !$omp target teams distribute num_teams(nz+1) map(alloc:stencil,vals,d3_vals)
     do k = 1 , nz+1
+      !!$omp parallel do private(stencil,vals,d3_vals)
       !$omp parallel do private(stencil,vals,d3_vals)
       do i = 1 , nx
         !Use fourth-order interpolation from four cell averages to compute the value at the interface in question
@@ -130,10 +131,8 @@ set_argnames(*args)
       !$omp end parallel do
     enddo
     !$omp end target teams distribute
-!
-!    !$omp target update from(flux)
-!
-!    !Use the fluxes to compute tendencies for each cell
+
+    !Use the fluxes to compute tendencies for each cell
     !$omp target teams distribute parallel do collapse(3)
     do ll = 1 , NUM_VARS
       do k = 1 , nz
@@ -147,7 +146,7 @@ set_argnames(*args)
     enddo
     !$omp end target teams distribute parallel do
 
-    !$omp target update from(tend)
+    !!$omp target update from(tend)
 
 [openacc_fortran]
 

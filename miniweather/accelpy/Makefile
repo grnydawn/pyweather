@@ -20,17 +20,18 @@ debug: clean
 
 crusher_debug: clean
 	#module load craype-accel-amd-gfx90a rocm; srun -n1 python ./miniweather_accelpy.py --debug
-	module load craype-accel-amd-gfx90a rocm; srun -n1 python ./miniweather_accelpy.py
+	module load craype-accel-amd-gfx90a rocm; srun -n1 -c64 python ./miniweather_accelpy.py
 
 summit_debug: clean
-	jsrun -n 1 ${PYTHON} ./miniweather_accelpy.py -o ${MEMBERWORK}/cli115/miniweather_accel.slab -w ${MEMBERWORK}/cli115/pyweatherwork
+	#jsrun -n 21 -c 2 -a 1 -g 1 ${PYTHON} ./miniweather_accelpy.py -o ${MEMBERWORK}/cli115/miniweather_accel.slab -w ${MEMBERWORK}/cli115/pyweatherwork
+	jsrun -n1 -c4 -a 21 ${PYTHON} ./miniweather_accelpy.py -o ${MEMBERWORK}/cli115/miniweather_accel.slab -w ${MEMBERWORK}/cli115/pyweatherwork
 
 profile: clean
 	srun -n ${NPROCS} -A cli133 -t ${WALLTIME} -p ${PROJECT} -o miniweather_accelpy.log  ./profile.sh
 
 crusher_profile: clean
 	#module load craype-accel-amd-gfx90a rocm; srun -n${NPROCS} profile.sh -o ${MEMBERWORK}/cli115/miniweather_accel.slab -w ${MEMBERWORK}/cli115/pyweatherwork
-	module load craype-accel-amd-gfx90a rocm; srun -n1 profile.sh
+	module load craype-accel-amd-gfx90a rocm; srun -n1 -c64 ./profile.sh
 
 valgrind_spock: clean
 	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes python ./miniweather_accelpy.py --debug &> valgrind.out
