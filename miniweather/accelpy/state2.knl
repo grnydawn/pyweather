@@ -14,22 +14,26 @@ set_argnames(*args)
         end do
       end do
     end do
+    !$omp end parallel do
 
 [omptarget_fortran]
 
     integer :: i,k,ll
 
-    !$omp target update to(state_init)
+    !$omp target update to(state_init, tend)
 
-    !$omp target teams num_teams(nx) distribute parallel do collapse(3)
+    !$omp target teams num_teams(NUM_VARS)
+    !$omp distribute
     do ll = 1 , NUM_VARS
+      !$omp parallel do collapse(2)
       do k = 1 , nz
 	    do i = 1 , nx
           state_out(i,k,ll) = state_init(i,k,ll) + dt * tend(i,k,ll)
         end do
       end do
+      !$omp end parallel do
     end do
-    !$omp end target teams distribute parallel do
+    !$omp end target teams
 
     !$omp target update from(state_out)
 
@@ -68,3 +72,11 @@ set_argnames(*args)
 
     #pragma acc update self(state_out)
     #pragma omp target update from(state_out)
+
+[hip, cuda: gridsize=GRID, blocksize=BLOCK]
+
+    int i  = blockIdx.x * blockDim.x + threadIdx.x;
+    int ll = blockIdx.y * blockDim.y + threadIdx.y;
+    int k  = blockIdx.z * blockDim.z + threadIdx.z;
+
+    state_out[i+hs][k+hs][ll] = state_init[i+hs][k+hs][ll] + dt * tend[i][k][ll];

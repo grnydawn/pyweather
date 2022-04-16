@@ -3,19 +3,21 @@ from mpi4py import MPI
 import pyslabs
 import accelpy
 
-#accel_type = "omptarget"
+accel_type = "omptarget"
 #accel_type = "openacc"
 #accel_type = "openmp"
 #accel_type = "fortran"
 
-#lang_type = "fortran"
+lang_type = "fortran"
 
 #accel_type = "omptarget"
 #accel_type = "openacc" # cray does not support openacc_cpp
 #accel_type = "openmp"
-accel_type = "cpp"
+#accel_type = "cpp"
+#accel_type = "hip"
+#accel_type = "cuda"
 
-lang_type = "cpp"
+#lang_type = "cpp"
 
 CONT = "C" if lang_type == "cpp" else "F"
 
@@ -432,24 +434,33 @@ class LocalDomain():
 
 #        print("state_init sum: %f" % state_init.sum())
 
+        env = {}
+
+        if accel_type in ("hip", "cuda"):
+            env["GRID"] = (1, NUM_VARS, self.nz)
+            env["BLOCK"] =  (self.nx, 1, 1)
+
         #import pdb; pdb.set_trace()
+
         if id(state_init) == id(state_out):
             data = [self.hs, self.nx, self.nz, dt, NUM_VARS,
                     state_out, self.tend]
-
-            self.accel.launch(self.kernel_state1, *data)
+            
+            self.accel.launch(self.kernel_state1, *data,
+                updateto=(state_out, self.tend ), updatefrom=(state_out,), environ=env)
         else:
             data = [self.hs, self.nx, self.nz, dt, NUM_VARS,
                     state_out, state_init, self.tend]
 
-            self.accel.launch(self.kernel_state2, *data)
+            self.accel.launch(self.kernel_state2, *data,
+                updateto=(state_init, self.tend), updatefrom=(state_out,), environ=env)
 
 #        for ll in range(NUM_VARS):
 #            for k in range(self.nz):
 #                for i in range(self.nx):
 #                    state_out[i+self.hs, k+self.hs, ll] = (state_init[i+self.hs, k+self.hs, ll] +
 #                                                            dt * self.tend[i, k, ll])
-#        print("state_out sum: %f" % state_out.sum())
+        print("state_out sum: %f" % state_out.sum())
 
     def timestep(self):
 
