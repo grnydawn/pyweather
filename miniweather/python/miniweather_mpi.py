@@ -262,8 +262,6 @@ class LocalDomain():
                                         state[i+self.hs, k+self.hs, self.ID_DENS] * self.grav)
               
 
-        print("ZZZZ TEND", numpy.sum(self.tend))
-
     def set_halo_values_x(self, state):
 
         recvs = []
@@ -328,7 +326,6 @@ class LocalDomain():
                 for i in range(self.nx):
                     self.tend[i, k, ll] = -(self.flux[i+1, k, ll] - self.flux[i, k, ll]) / self.dx
 
-        print("XXXX TEND", numpy.sum(self.tend))
 
     def semi_discrete_step(self, state_init, state_forcing, state_out, dt, dir):
 
@@ -344,6 +341,8 @@ class LocalDomain():
                 for i in range(self.nx):
                     state_out[i+self.hs, k+self.hs, ll] = (state_init[i+self.hs, k+self.hs, ll] +
                                                             dt * self.tend[i, k, ll])
+
+        print("state_out sum: %f" % state_out.sum())
 
     def timestep(self):
 

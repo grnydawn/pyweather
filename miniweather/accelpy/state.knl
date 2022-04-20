@@ -22,12 +22,12 @@ set_argnames(*args)
 
     !$omp target update to(state_init, tend)
 
-    !$omp target teams num_teams(NUM_VARS)
+    !$omp target teams num_teams(nx)
     !$omp distribute
-    do ll = 1 , NUM_VARS
+	do i = 1 , nx
       !$omp parallel do collapse(2)
-      do k = 1 , nz
-	    do i = 1 , nx
+      do ll = 1 , NUM_VARS
+        do k = 1 , nz
           state_out(i,k,ll) = state_init(i,k,ll) + dt * tend(i,k,ll)
         end do
       end do
@@ -76,7 +76,9 @@ set_argnames(*args)
 [hip, cuda: gridsize=GRID, blocksize=BLOCK]
 
     int i  = blockIdx.x * blockDim.x + threadIdx.x;
-    int ll = blockIdx.y * blockDim.y + threadIdx.y;
-    int k  = blockIdx.z * blockDim.z + threadIdx.z;
+    int k  = blockIdx.y * blockDim.y + threadIdx.y;
+    int ll = blockIdx.z * blockDim.z + threadIdx.z;
 
-    state_out[i+hs][k+hs][ll] = state_init[i+hs][k+hs][ll] + dt * tend[i][k][ll];
+    if (i < nx) {
+		state_out[i+hs][k+hs][ll] = state_init[i+hs][k+hs][ll] + dt * tend[i][k][ll];
+    }
