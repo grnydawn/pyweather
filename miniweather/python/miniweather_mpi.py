@@ -467,7 +467,7 @@ def main():
     parser = argparse.ArgumentParser(description='Python porting of miniWeather')
     parser.add_argument('-x', '--nx', default=NX, type=int,
                         help='number of total grid cells in the x-dimension')
-    parser.add_argument('-y', '--nz', default=NZ, type=int,
+    parser.add_argument('-z', '--nz', default=NZ, type=int,
                         help='number of total grid cells in the z-dimension')
     parser.add_argument('-s', '--simtime', default=SIM_TIME,
                         type=float, help='total simulation time in seconds')

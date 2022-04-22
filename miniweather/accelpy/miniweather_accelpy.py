@@ -5,27 +5,6 @@ import accelpy
 
 NGPUTHREADS = 1024
 
-vendor_type = "*"
-#vendor_type = "pgi"
-
-#accel_type = "omptarget"
-#accel_type = "openacc"
-#accel_type = "openmp"
-#accel_type = "fortran"
-
-#lang_type = "fortran"
-
-#accel_type = "omptarget"
-#accel_type = "openacc" # cray does not support openacc_cpp
-#accel_type = "openmp"
-#accel_type = "cpp"
-#accel_type = "hip"
-accel_type = "cuda"
-
-lang_type = "cpp"
-
-CONT = "C" if lang_type == "cpp" else "F"
-
 NX = 100 # 400 # 100 # 2000 # 100            # number of local grid cells in the x-dimension
 NZ = 50 # 200 # 50 # 1000 # 50             # number of local grid cells in the z-dimension
 SIM_TIME = 10 # 5 # 10     # total simulation time in seconds
@@ -82,9 +61,11 @@ class LocalDomain():
     exner0 = 1. # Surface-level Exner pressure
 
 
-    def __init__(self, nx_glob, nz_glob, data_spec, outfile, workdir, debug=False):
+    def __init__(self, nx_glob, nz_glob, data_spec, outfile, workdir,
+                    vendor, language, accel, debug=False):
 
         self.debug = debug
+        self.accel_type = accel
 
         self.comm = MPI.COMM_WORLD
         self.nranks = self.comm.Get_size()
@@ -110,18 +91,20 @@ class LocalDomain():
 
         self.dt = min(self.dx, self.dz) / self.max_speed * self.cfl
 
+        CONT_TYPE = "C" if language == "cpp" else "F"
+
         state_shape = (self.nx + self.hs*2, self.nz + self.hs*2, NUM_VARS)
-        self.state = numpy.zeros(state_shape, order=CONT, dtype=numpy.float64)
-        self.state_tmp = numpy.empty(state_shape, order=CONT, dtype=numpy.float64)
+        self.state = numpy.zeros(state_shape, order=CONT_TYPE, dtype=numpy.float64)
+        self.state_tmp = numpy.empty(state_shape, order=CONT_TYPE, dtype=numpy.float64)
 
         buf_shape = (self.hs, self.nz, NUM_VARS)
-        self.sendbuf_l = numpy.empty(buf_shape, order=CONT, dtype=numpy.float64)
-        self.sendbuf_r = numpy.empty(buf_shape, order=CONT, dtype=numpy.float64)
-        self.recvbuf_l = numpy.empty(buf_shape, order=CONT, dtype=numpy.float64)
-        self.recvbuf_r = numpy.empty(buf_shape, order=CONT, dtype=numpy.float64)
+        self.sendbuf_l = numpy.empty(buf_shape, order=CONT_TYPE, dtype=numpy.float64)
+        self.sendbuf_r = numpy.empty(buf_shape, order=CONT_TYPE, dtype=numpy.float64)
+        self.recvbuf_l = numpy.empty(buf_shape, order=CONT_TYPE, dtype=numpy.float64)
+        self.recvbuf_r = numpy.empty(buf_shape, order=CONT_TYPE, dtype=numpy.float64)
 
-        self.flux = numpy.zeros((self.nx+1, self.nz+1, NUM_VARS), order=CONT, dtype=numpy.float64)
-        self.tend = numpy.zeros((self.nx, self.nz, NUM_VARS), order=CONT, dtype=numpy.float64)
+        self.flux = numpy.zeros((self.nx+1, self.nz+1, NUM_VARS), order=CONT_TYPE, dtype=numpy.float64)
+        self.tend = numpy.zeros((self.nx, self.nz, NUM_VARS), order=CONT_TYPE, dtype=numpy.float64)
 
         self.hy_dens_cell = numpy.zeros(self.nz+self.hs*2, dtype=numpy.float64)
         self.hy_dens_theta_cell = numpy.zeros(self.nz+self.hs*2, dtype=numpy.float64)
@@ -237,9 +220,9 @@ class LocalDomain():
         }
 
         self.accel = accelpy.Accel(
-            accel=accel_type,
-            vendor=vendor_type,
-            lang=lang_type,
+            accel=accel,
+            vendor=vendor,
+            lang=language,
             copyinout=(self.state, self.state_tmp, self.tend),
             copyin=(
                 self.hy_dens_cell,
@@ -280,8 +263,8 @@ class LocalDomain():
 
         env = {}
 
-        if accel_type in ("hip", "cuda"):
-            env["GRID"] = (int((self.nx+NGPUTHREADS-1)/NGPUTHREADS), self.nz, NUM_VARS)
+        if self.accel_type in ("hip", "cuda"):
+            env["GRID"] = (int((self.nx+NGPUTHREADS-1)/NGPUTHREADS), self.nz+1, NUM_VARS)
             env["BLOCK"] =  (NGPUTHREADS, 1, 1)
 
         data = [
@@ -379,53 +362,53 @@ class LocalDomain():
         MPI.Request.Waitall(sends)
 
     def compute_tendencies_x(self, state):
+
+        data = [
+            self.hs, self.nx, self.nz, NUM_VARS, state, self.hv_beta,
+            self.dx, self.dt, self.sten_size, self.ID_DENS+1, self.ID_UMOM+1,
+            self.ID_WMOM+1, self.ID_RHOT+1, self.hy_dens_cell, self.c0,
+            self.gamma, self.grav, self.hy_dens_theta_cell, self.flux, self.tend
+        ]
+
+        self.accel.launch(self.kernel_x, *data)
+
 #
-#        data = [
-#            self.hs, self.nx, self.nz, NUM_VARS, state, self.hv_beta,
-#            self.dx, self.dt, self.sten_size, self.ID_DENS+1, self.ID_UMOM+1,
-#            self.ID_WMOM+1, self.ID_RHOT+1, self.hy_dens_cell, self.c0,
-#            self.gamma, self.grav, self.hy_dens_theta_cell, self.flux, self.tend
-#        ]
+#        # Compute the hyperviscosity coeficient
+#        hv_coef = -self.hv_beta * self.dx / (16. * self.dt)
 #
-#        self.accel.launch(self.kernel_x, *data)
-
-
-        # Compute the hyperviscosity coeficient
-        hv_coef = -self.hv_beta * self.dx / (16. * self.dt)
-
-        # Compute fluxes in the x-direction for each cell
-        for k in range(self.nz):
-            for i in range(self.nx + 1):
-                # Use fourth-order interpolation from four cell averages
-                # to compute the value at the interface in question
-                for ll in range(NUM_VARS):
-                    for s in range(self.sten_size):
-                        self.stencil[s] = state[i + s, k+self.hs, ll]
-
-                    self.vals[ll] = (-self.stencil[0]/12. + 7.*self.stencil[1]/12. +
-                                7.*self.stencil[2]/12. - self.stencil[3]/12.)
-                    self.d3_vals[ll] = (-self.stencil[0] + 3.*self.stencil[1] -
-                                    3.*self.stencil[2] + self.stencil[3])
-
-                # Compute density, u-wind, w-wind, potential temperature,
-                # and pressure (r,u,w,t,p respectively)
-
-                r = self.vals[self.ID_DENS] + self.hy_dens_cell[k+self.hs]
-                u = self.vals[self.ID_UMOM] / r
-                w = self.vals[self.ID_WMOM] / r
-                t = (self.vals[self.ID_RHOT] + self.hy_dens_theta_cell[k+self.hs] ) / r
-                p = self.c0*math.pow(r*t, self.gamma)
-
-                #Compute the flux vector
-                self.flux[i,k,self.ID_DENS] = r*u     - hv_coef*self.d3_vals[self.ID_DENS]
-                self.flux[i,k,self.ID_UMOM] = r*u*u+p - hv_coef*self.d3_vals[self.ID_UMOM]
-                self.flux[i,k,self.ID_WMOM] = r*u*w   - hv_coef*self.d3_vals[self.ID_WMOM]
-                self.flux[i,k,self.ID_RHOT] = r*u*t   - hv_coef*self.d3_vals[self.ID_RHOT]
-
-        for ll in range(NUM_VARS):
-            for k in range(self.nz):
-                for i in range(self.nx):
-                    self.tend[i, k, ll] = -(self.flux[i+1, k, ll] - self.flux[i, k, ll]) / self.dx
+#        # Compute fluxes in the x-direction for each cell
+#        for k in range(self.nz):
+#            for i in range(self.nx + 1):
+#                # Use fourth-order interpolation from four cell averages
+#                # to compute the value at the interface in question
+#                for ll in range(NUM_VARS):
+#                    for s in range(self.sten_size):
+#                        self.stencil[s] = state[i + s, k+self.hs, ll]
+#
+#                    self.vals[ll] = (-self.stencil[0]/12. + 7.*self.stencil[1]/12. +
+#                                7.*self.stencil[2]/12. - self.stencil[3]/12.)
+#                    self.d3_vals[ll] = (-self.stencil[0] + 3.*self.stencil[1] -
+#                                    3.*self.stencil[2] + self.stencil[3])
+#
+#                # Compute density, u-wind, w-wind, potential temperature,
+#                # and pressure (r,u,w,t,p respectively)
+#
+#                r = self.vals[self.ID_DENS] + self.hy_dens_cell[k+self.hs]
+#                u = self.vals[self.ID_UMOM] / r
+#                w = self.vals[self.ID_WMOM] / r
+#                t = (self.vals[self.ID_RHOT] + self.hy_dens_theta_cell[k+self.hs] ) / r
+#                p = self.c0*math.pow(r*t, self.gamma)
+#
+#                #Compute the flux vector
+#                self.flux[i,k,self.ID_DENS] = r*u     - hv_coef*self.d3_vals[self.ID_DENS]
+#                self.flux[i,k,self.ID_UMOM] = r*u*u+p - hv_coef*self.d3_vals[self.ID_UMOM]
+#                self.flux[i,k,self.ID_WMOM] = r*u*w   - hv_coef*self.d3_vals[self.ID_WMOM]
+#                self.flux[i,k,self.ID_RHOT] = r*u*t   - hv_coef*self.d3_vals[self.ID_RHOT]
+#
+#        for ll in range(NUM_VARS):
+#            for k in range(self.nz):
+#                for i in range(self.nx):
+#                    self.tend[i, k, ll] = -(self.flux[i+1, k, ll] - self.flux[i, k, ll]) / self.dx
 
         #print("XXXX TEND", numpy.sum(self.tend))
 
@@ -442,7 +425,7 @@ class LocalDomain():
 
         env = {}
 
-        if accel_type in ("hip", "cuda"):
+        if self.accel_type in ("hip", "cuda"):
             env["GRID"] = (int((self.nx+NGPUTHREADS-1)/NGPUTHREADS), self.nz, NUM_VARS)
             env["BLOCK"] =  (NGPUTHREADS, 1, 1)
 
@@ -582,7 +565,7 @@ def main():
     parser = argparse.ArgumentParser(description='Python porting of miniWeather')
     parser.add_argument('-x', '--nx', default=NX, type=int,
                         help='number of total grid cells in the x-dimension')
-    parser.add_argument('-y', '--nz', default=NZ, type=int,
+    parser.add_argument('-z', '--nz', default=NZ, type=int,
                         help='number of total grid cells in the z-dimension')
     parser.add_argument('-s', '--simtime', default=SIM_TIME,
                         type=float, help='total simulation time in seconds')
@@ -592,14 +575,24 @@ def main():
                         help='which data initialization to use')
     parser.add_argument('-o', '--outfile', default=OUTFILE,
                         help='output file name')
+    parser.add_argument('-v', '--vendor', default='gnu',
+                        help='name of compiler vendor(default=gnu)')
+    parser.add_argument('-l', '--language', default='fortran',
+                        help='name of programming language(default=fortran)')
+    parser.add_argument('-a', '--accel', default='fortran',
+                        help='name of accelerator programming model(default=fortran)')
     parser.add_argument('-w', '--workdir',
                         help='work directory to generate an output file')
     parser.add_argument('--debug', action="store_true", help='activate debugging mode')
 
     argps = parser.parse_args()
 
+    if argps.accel in ("hip", "cuda"):
+        argps.language = "C"
+
     domain = LocalDomain(argps.nx, argps.nz, argps.dataspec, argps.outfile,
-                         argps.workdir, debug=argps.debug)
+                         argps.workdir, argps.vendor, argps.language,
+                         argps.accel, debug=argps.debug)
 
     mass0, te0 = domain.reductions()
 
