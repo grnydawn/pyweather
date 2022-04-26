@@ -38,6 +38,10 @@ summit_debug: clean
 profile: clean
 	srun -n ${NPROCS} -A cli133 -t ${WALLTIME} -p ${PROJECT} -o miniweather_accelpy.log  ./profile.sh
 
+summit_nvprof: clean
+	jsrun -n1 -c1 -g 1  nvprof --profile-child-processes ${PYTHON} ./miniweather_accelpy.py -l ${LANG} -a ${ACCEL} -v ${VENDOR} -x ${NX} -z ${NZ} -s ${TIME} -f ${FREQ} -o ${MEMBERWORK}/cli115/miniweather_accel.slab -w ${MEMBERWORK}/cli115/pyweatherwork
+
+
 crusher_profile: clean
 	#module load craype-accel-amd-gfx90a rocm; srun -n${NPROCS} profile.sh -o ${MEMBERWORK}/cli115/miniweather_accel.slab -w ${MEMBERWORK}/cli115/pyweatherwork
 	module load craype-accel-amd-gfx90a rocm; srun -n1 -c64 ./profile.sh
